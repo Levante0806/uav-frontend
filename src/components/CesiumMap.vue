@@ -4,9 +4,6 @@ import * as Cesium from 'cesium';
 import axios from 'axios';
 import { ElMessage } from 'element-plus';
 
-// --------------------------------------------------------------------
-// 1. 状态定义
-// --------------------------------------------------------------------
 const CESIUM_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjODYwMjZkMi02YzAzLTRiZjgtYWQ4Yy1lYzkzMmFjOTBjZjAiLCJpZCI6MjkwMTU0LCJpYXQiOjE3NjUwMzQxOTR9.WMQF23KeDp9RCrIK_Zc0lH2G2yfgTNjypGuRahUL-0M';
 const API_BASE = 'http://127.0.0.1:8000';
 
@@ -16,7 +13,7 @@ const HOME_BASE_NAME = '无人机中心站点';
 const viewerRef = shallowRef(null);
 
 const userInput = ref(
-  '一号机从北门出发取完货物，送到汇文楼去，同时二号机从立言门取完货物，送到田径运动场去'
+  '一号机出发去北门取完外卖，先送到汇文楼去，再送到米兰斋去，最后送到元平体育馆去。'
 );
 const loading = ref(false);
 const taskList = ref([]);
@@ -38,9 +35,6 @@ const DRONE_COLORS = [
   Cesium.Color.GOLD,
 ];
 
-// --------------------------------------------------------------------
-// 2. 地图初始化
-// --------------------------------------------------------------------
 onMounted(async () => {
   try {
     Cesium.Ion.defaultAccessToken = CESIUM_TOKEN;
@@ -101,9 +95,6 @@ const resetCamera = (viewer) => {
   });
 };
 
-// --------------------------------------------------------------------
-// 3. 工具函数
-// --------------------------------------------------------------------
 const getModeLabel = (mode) => {
   if (mode === 'direct') return '直接执行';
   if (mode === 'after_swap') return '换电后执行';
@@ -126,6 +117,21 @@ const getDroneColor = (droneId, mode = 'direct') => {
   const match = String(droneId).match(/(\d+)/);
   const index = match ? Number(match[1]) - 1 : 0;
   return DRONE_COLORS[index % DRONE_COLORS.length];
+};
+
+const formatMeters = (value) => {
+  if (value == null) return '--';
+  return `${value.toFixed(1)} m`;
+};
+
+const formatMinutes = (value) => {
+  if (value == null) return '--';
+  return `${value.toFixed(2)} min`;
+};
+
+const formatPercent = (value) => {
+  if (value == null) return '--';
+  return `${value.toFixed(1)}%`;
 };
 
 const getTaskChains = (tasks) => {
@@ -169,9 +175,6 @@ const getTaskChains = (tasks) => {
   return chains;
 };
 
-// --------------------------------------------------------------------
-// 4. 核心业务逻辑
-// --------------------------------------------------------------------
 const handleSendCommand = async () => {
   if (!userInput.value) return;
   loading.value = true;
@@ -195,9 +198,6 @@ const handleSendCommand = async () => {
   }
 };
 
-// --------------------------------------------------------------------
-// 5. 仿真核心逻辑
-// --------------------------------------------------------------------
 const runSimulation = (tasks) => {
   const viewer = viewerRef.value;
   if (!viewer) return;
@@ -225,12 +225,7 @@ const runSimulation = (tasks) => {
       const droneColor = getDroneColor(task.assigned_drone_id, task.execution_mode);
 
       if (task.execution_mode === 'infeasible') {
-        addMarker(
-          viewer,
-          task.coordinates,
-          `${task.location_name}（不可执行）`,
-          droneColor
-        );
+        addMarker(viewer, task.coordinates, `${task.location_name}（不可执行）`, droneColor);
       } else {
         addMarker(
           viewer,
@@ -334,10 +329,8 @@ const runSimulation = (tasks) => {
         if (Cesium.JulianDate.compare(returnStopTime, globalStop) > 0) {
           globalStop = returnStopTime;
         }
-      } else {
-        if (Cesium.JulianDate.compare(stopTime, globalStop) > 0) {
-          globalStop = stopTime;
-        }
+      } else if (Cesium.JulianDate.compare(stopTime, globalStop) > 0) {
+        globalStop = stopTime;
       }
     });
   });
@@ -349,9 +342,6 @@ const runSimulation = (tasks) => {
   viewer.clock.multiplier = 5;
 };
 
-// --------------------------------------------------------------------
-// 6. 视角切换逻辑
-// --------------------------------------------------------------------
 watch(isFollowMode, (val) => {
   const viewer = viewerRef.value;
   if (!viewer) return;
@@ -364,9 +354,6 @@ watch(isFollowMode, (val) => {
   }
 });
 
-// --------------------------------------------------------------------
-// 7. 实体创建/绘制函数
-// --------------------------------------------------------------------
 const createDroneEntity = (viewer, startTime, stopTime, startPoint, endPoint, id, color) => {
   const positionProperty = new Cesium.SampledPositionProperty();
   positionProperty.addSample(startTime, startPoint);
@@ -600,17 +587,69 @@ const addReturnLine = (viewer, startPoint, endPoint, id, color, mode) => {
             <span class="task-location">{{ t.location_name }}</span>
           </div>
 
-          <div class="task-meta">
-            <span v-if="t.estimated_total_time_min != null">
-              链总耗时：{{ t.estimated_total_time_min.toFixed(2) }} min
-            </span>
+          <div class="task-step" v-if="t.chain_step_index != null && t.total_tasks_in_chain != null">
+            步骤 {{ t.chain_step_index }}/{{ t.total_tasks_in_chain }}
+          </div>
 
-            <span
-              v-if="t.return_margin_min != null"
-              class="task-meta-item"
+          <div v-if="t.show_chain_summary" class="chain-summary">
+            <div class="summary-title">链级摘要</div>
+            <div class="summary-row" v-if="t.battery_before_min != null">
+              <span>起始可用电量：</span>
+              <span>{{ formatMinutes(t.battery_before_min) }}</span>
+            </div>
+            <div class="summary-row" v-if="t.estimated_total_time_min != null">
+              <span>链总耗时：</span>
+              <span>{{ formatMinutes(t.estimated_total_time_min) }}</span>
+            </div>
+            <div class="summary-row" v-if="t.return_margin_min != null">
+              <span>最终返航余量：</span>
+              <span>{{ formatMinutes(t.return_margin_min) }}</span>
+            </div>
+          </div>
+
+          <div class="node-metrics">
+            <div class="metric-row" v-if="t.segment_from_name">
+              <span>当前段：</span>
+              <span>{{ t.segment_from_name }} -> {{ t.location_name }}</span>
+            </div>
+
+            <div class="metric-row" v-if="t.segment_distance_m != null || t.segment_time_min != null">
+              <span>本段距离 / 耗时：</span>
+              <span>{{ formatMeters(t.segment_distance_m) }} / {{ formatMinutes(t.segment_time_min) }}</span>
+            </div>
+
+            <div class="metric-row" v-if="t.task_exec_time_min != null">
+              <span>当前节点执行耗时：</span>
+              <span>{{ formatMinutes(t.task_exec_time_min) }}</span>
+            </div>
+
+            <div class="metric-row" v-if="t.cumulative_time_min != null">
+              <span>累计耗时：</span>
+              <span>{{ formatMinutes(t.cumulative_time_min) }}</span>
+            </div>
+
+            <div
+              class="metric-row"
+              v-if="t.battery_remaining_after_task_min != null || t.battery_remaining_after_task_pct != null"
             >
-              返航余量：{{ t.return_margin_min.toFixed(2) }} min
-            </span>
+              <span>执行后剩余电量：</span>
+              <span>
+                {{ formatMinutes(t.battery_remaining_after_task_min) }}
+                <template v-if="t.battery_remaining_after_task_pct != null">
+                  ({{ formatPercent(t.battery_remaining_after_task_pct) }})
+                </template>
+              </span>
+            </div>
+
+            <div
+              class="metric-row"
+              v-if="t.return_distance_from_here_m != null || t.return_time_from_here_min != null"
+            >
+              <span>当前点返航需求：</span>
+              <span>
+                {{ formatMeters(t.return_distance_from_here_m) }} / {{ formatMinutes(t.return_time_from_here_min) }}
+              </span>
+            </div>
           </div>
 
           <div v-if="t.infeasible_reason" class="task-error">
@@ -639,7 +678,7 @@ const addReturnLine = (viewer, startPoint, endPoint, id, color, mode) => {
   position: absolute;
   top: 20px;
   left: 20px;
-  width: 340px;
+  width: 360px;
   max-height: calc(100vh - 40px);
   overflow-y: auto;
   background: rgba(30, 30, 30, 0.85);
@@ -676,15 +715,15 @@ const addReturnLine = (viewer, startPoint, endPoint, id, color, mode) => {
 
 .task-list {
   margin-top: 15px;
-  max-height: 260px;
+  max-height: 52vh;
   overflow-y: auto;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   padding-top: 10px;
 }
 
 .task-item {
-  margin: 8px 0;
-  padding: 8px 0;
+  margin: 10px 0;
+  padding: 10px 0;
   color: #ccc;
   font-size: 13px;
   border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
@@ -701,18 +740,43 @@ const addReturnLine = (viewer, startPoint, endPoint, id, color, mode) => {
   color: #f5f7fa;
 }
 
-.task-meta {
+.task-step {
   margin-top: 6px;
   font-size: 12px;
-  color: #999;
+  color: #c0c4cc;
 }
 
-.task-meta-item {
-  margin-left: 8px;
+.chain-summary {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(64, 158, 255, 0.12);
+  border: 1px solid rgba(64, 158, 255, 0.25);
+  border-radius: 8px;
+}
+
+.summary-title {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #8cc5ff;
+  font-weight: 600;
+}
+
+.summary-row,
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  line-height: 1.5;
+}
+
+.node-metrics {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #d0d3d8;
 }
 
 .task-error {
-  margin-top: 6px;
+  margin-top: 8px;
   font-size: 12px;
   color: #f56c6c;
 }
