@@ -20,5 +20,3 @@ body, html, #app {
 </style>
 
 //const CESIUM_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJjODYwMjZkMi02YzAzLTRiZjgtYWQ4Yy1lYzkzMmFjOTBjZjAiLCJpZCI6MjkwMTU0LCJpYXQiOjE3NjUwMzQxOTR9.WMQF23KeDp9RCrIK_Zc0lH2G2yfgTNjypGuRahUL-0M';
-
-

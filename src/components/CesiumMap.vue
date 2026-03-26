@@ -23,7 +23,7 @@ const isFollowMode = ref(false);
 const droneEntities = ref([]);
 
 const DRONE_SPEED = 20.0;
-const ROUTE_HEIGHT = 200.0;
+const ROUTE_HEIGHT = 5.0;
 
 const DRONE_COLORS = [
   Cesium.Color.LIME,
