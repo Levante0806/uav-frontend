@@ -1,4 +1,4 @@
-﻿<script setup>
+<script setup>
 import { HOME_BASE_NAME } from '../../utils/constants';
 
 const props = defineProps({
@@ -146,6 +146,11 @@ const isSortieEndTask = (task) => {
         <div class="summary-row" v-if="t.return_margin_min != null">
           <span>最终返航余量：</span>
           <span>{{ formatMinutes(t.return_margin_min) }}</span>
+        </div>
+
+        <div class="summary-row">
+          <span>风向风速预估：</span>
+          <span>东南风 3.5 m/s (预估)</span>
         </div>
       </div>
 
